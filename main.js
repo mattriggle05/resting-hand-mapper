@@ -6,6 +6,8 @@ if (!('ontouchstart' in window) && !(navigator.maxTouchPoints > 0) && !(navigato
 const canvas = document.getElementById('main-canvas');
 const canvas2 = document.getElementById('normalized-canvas');
 const output = document.getElementById('output');
+const pennySlider = document.getElementById('penny-slider');
+const pennyDiv = document.getElementById('penny-div');
 let ctx;
 let ctx2;
 
@@ -30,6 +32,29 @@ function rescale() {
 }
 window.addEventListener('resize', rescale);
 rescale();
+
+// PENNY CALIBRATION
+
+const PENNY_DIAMETER_MM = 19.05000;
+
+function getPennyRadiusPixels() {
+    return parseFloat(pennySlider.value);
+}
+
+function pixelsToMm(pixels) {
+    const pennyRadiusPixels = getPennyRadiusPixels();
+    const pixelsPerMm = (pennyRadiusPixels * 2) / PENNY_DIAMETER_MM;
+    return (pixels / pixelsPerMm).toFixed(2);
+}
+
+function updatePenny() {
+    const diameter = getPennyRadiusPixels() * 2;
+    pennyDiv.style.width = `${diameter}px`;
+    pennyDiv.style.height = `${diameter}px`;
+}
+
+pennySlider.addEventListener('input', updatePenny);
+updatePenny();
 
 // DRAWING STUFF
 
@@ -92,8 +117,8 @@ function toHandCoords(touch, thumb, nx, ny) {
     const dx = touch.pageX - thumb.pageX;
     const dy = touch.pageY - thumb.pageY;
     return {
-        x: ((dx * -ny) + (dy * nx)).toFixed(4),
-        y: ((dx * nx) + (dy * ny)).toFixed(4)
+        x: ((dx * -ny) + (dy * nx)),
+        y: ((dx * nx) + (dy * ny))
     };
 }
 
@@ -112,12 +137,10 @@ function draw() {
     const thumb = getFurthestFrom(centroid, activeTouches);
     const index = getNearestTo(thumb, activeTouches);
 
-    // vector from thumb to index marks the Y axis, so the position is always (0, distance)
-    var indexThumbDiffX = index.pageX - thumb.pageX
-    var indexThumbDiffY = index.pageY - thumb.pageY
+    var indexThumbDiffX = index.pageX - thumb.pageX;
+    var indexThumbDiffY = index.pageY - thumb.pageY;
     var indexThumbDistance = Math.hypot(indexThumbDiffX, indexThumbDiffY);
     
-    // draw coordinate grid lines
     const nx = indexThumbDiffX / indexThumbDistance;
     const ny = indexThumbDiffY / indexThumbDistance;
 
@@ -140,47 +163,44 @@ function draw() {
     var positions = [];
     for (const touch of activeTouches.values()) {
         let angle = Math.atan2(indexThumbDiffY, indexThumbDiffX) + Math.PI / 2;
-        let transformed = toHandCoords(touch, thumb, nx, ny)
+        let transformed = toHandCoords(touch, thumb, nx, ny);
         if (transformed.x != 0 || transformed.y != 0) positions.push(transformed);
         if (transformed.x > 0.1) isRightHand = true;
-        drawText(touch.pageX, touch.pageY, angle, `(${Math.round(transformed.x)}, ${Math.round(transformed.y)})`, '#00ff00')
+        drawText(touch.pageX, touch.pageY, angle, `(${Math.round(transformed.x)}, ${Math.round(transformed.y)})`, '#00ff00');
     }
-    var outputJSON = {
-        isRightHand: isRightHand,
-        positions: positions,
-    }
-    output.value = JSON.stringify(outputJSON, null, "\t");
+
+    const positionsMm = positions.map(p => ({
+        x: pixelsToMm(p.x),
+        y: pixelsToMm(p.y),
+    }));
+
+    output.value = JSON.stringify({
+        isRightHand,
+        positionsMm,
+    }, null, "\t");
 
     const scale = ((canvas2.height / dpr) / (canvas.height / dpr)) * 0.9;
-
     ctx2.clearRect(0, 0, canvas2.width / dpr, canvas2.height / dpr);
 
     const anchorX = (canvas2.width / dpr) * (isRightHand ? 0.1 : 0.9);
-    const anchorY = (canvas2.height / dpr) * 0.95; 
-
-    // draw axes through thumb (thumb is at hand coord origin)
-    const thumbSx = anchorX;
-    const thumbSy = anchorY;
+    const anchorY = (canvas2.height / dpr) * 0.95;
 
     ctx2.setLineDash([10 * scale, 6 * scale]);
     ctx2.lineWidth = 2 * scale;
     ctx2.strokeStyle = '#000000aa';
 
-    // y axis — straight up in normalized view
     ctx2.beginPath();
-    ctx2.moveTo(thumbSx, thumbSy + 10000 * scale);
-    ctx2.lineTo(thumbSx, thumbSy - 10000 * scale);
+    ctx2.moveTo(anchorX, anchorY + 10000 * scale);
+    ctx2.lineTo(anchorX, anchorY - 10000 * scale);
     ctx2.stroke();
 
-    // x axis
     ctx2.beginPath();
-    ctx2.moveTo(thumbSx - 10000 * scale, thumbSy);
-    ctx2.lineTo(thumbSx + 10000 * scale, thumbSy);
+    ctx2.moveTo(anchorX - 10000 * scale, anchorY);
+    ctx2.lineTo(anchorX + 10000 * scale, anchorY);
     ctx2.stroke();
 
     ctx2.setLineDash([]);
 
-    // draw fingers
     for (const touch of activeTouches.values()) {
         const hc = toHandCoords(touch, thumb, nx, ny);
         const sx = anchorX + hc.x * scale;
@@ -232,7 +252,6 @@ function removeTouch(e) {
     }
     draw();
 }
-
 
 canvas.addEventListener('touchstart', changeTouch, { passive: false });
 canvas.addEventListener('touchmove', changeTouch, { passive: false });
