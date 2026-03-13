@@ -1,7 +1,6 @@
 const canvas = document.getElementById('canvas');
 let ctx;
 
-
 // MAKE THE CANVAS THE FULL PAGE
 
 function rescale() {
@@ -15,76 +14,87 @@ function rescale() {
 window.addEventListener('resize', rescale);
 rescale();
 
-
-
-// TOUCH STUFF
+// DRAWING STUFF
 
 const activeTouches = new Map();
 
+function drawCircleOutline(x, y, radius, color, lineWidth = 2) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, 2 * Math.PI);
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+}
+
+function drawText(x, y, text, font, fillColor, strokeColor) {
+    ctx.font = font;
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = strokeColor;
+    ctx.fillText(text,x,y);
+}
+
+function drawCircleFill(x, y, radius, color) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.fill();
+}
+
+function getCentroid(touches) {
+    let sumX = 0, sumY = 0;
+    for (const t of touches.values()) { sumX += t.pageX; sumY += t.pageY; }
+    return { pageX: sumX / touches.size, pageY: sumY / touches.size };
+}
+
+function getFurthestFrom(point, touches) {
+    let maxDist = -1, result = null;
+    for (const t of touches.values()) {
+        const d = Math.hypot(point.pageX - t.pageX, point.pageY - t.pageY);
+        if (d > maxDist) { maxDist = d; result = t; }
+    }
+    return result;
+}
+
+function getNearestTo(point, touches) {
+    let minDist = Infinity, result = null;
+    for (const t of touches.values()) {
+        const d = Math.hypot(point.pageX - t.pageX, point.pageY - t.pageY);
+        if (d > 0 && d < minDist) { minDist = d; result = t; }
+    }
+    return result;
+}
+
 function draw() {
-    let sumX = 0;
-    let sumY = 0;
     const dpr = window.devicePixelRatio || 1;
     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+
     for (const touch of activeTouches.values()) {
-        sumX += touch.pageX
-        sumY += touch.pageY
-        ctx.beginPath();
-        ctx.arc(touch.pageX, touch.pageY, 40, 0, 2 * Math.PI);
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = `#000000`;
-        ctx.stroke();
-        ctx.arc(touch.pageX, touch.pageY, 40, 0, 2 * Math.PI);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = `#00FF00`;
-        ctx.stroke();
+        drawCircleOutline(touch.pageX, touch.pageY, 40, '#000000', 4);
+        drawCircleOutline(touch.pageX, touch.pageY, 40, '#00FF00', 2);
     }
 
-    if (activeTouches.size === 5) {
-        const centroid = {
-            pageX: sumX / activeTouches.size,
-            pageY: sumY / activeTouches.size,
-        }
+    if (activeTouches.size !== 5) return;
 
-        ctx.beginPath();
-        ctx.arc(centroid.pageX, centroid.pageY, 22, 0, 2 * Math.PI);
-        ctx.fillStyle = `#000000`;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(centroid.pageX, centroid.pageY, 20, 0, 2 * Math.PI);
-        ctx.fillStyle = `#FF0000`;
-        ctx.fill();
+    const centroid = getCentroid(activeTouches);
+    drawCircleFill(centroid.pageX, centroid.pageY, 22, '#000000');
+    drawCircleFill(centroid.pageX, centroid.pageY, 20, '#FF0000');
 
+    const thumb = getFurthestFrom(centroid, activeTouches);
+    drawCircleFill(thumb.pageX, thumb.pageY, 40, '#0000FF');
+    drawText(thumb.pageX + 55, thumb.pageY - 2.5, "Thumb", "20px Arial", '#0000FF', '#000000')
+    // thumbs is always at the origin by convention
+    drawText(thumb.pageX + 55, thumb.pageY+22.5, "(0, 0)", "20px Arial", '#0000FF', '#000000')
 
-        var thumbPosition = NaN;
-        var maxDistanceForThumb = -1;
-        for (const touch of activeTouches.values()) {
-            let currDistance = Math.sqrt((centroid.pageX - touch.pageX)**2 + (centroid.pageY - touch.pageY)**2)
-            if (currDistance > maxDistanceForThumb) {
-                maxDistanceForThumb = currDistance
-                thumbPosition = touch;
-            }
-        }
-        ctx.beginPath();
-        ctx.arc(thumbPosition.pageX, thumbPosition.pageY, 50, 0, 2 * Math.PI);
-        ctx.fillStyle = `#0000FF`;
-        ctx.fill();
-
-        var indexPosition = NaN;
-        var minDistanceForIndex = Number.MAX_SAFE_INTEGER;
-        for (const touch of activeTouches.values()) {
-            let currDistance = Math.sqrt((thumbPosition.pageX - touch.pageX)**2 + (thumbPosition.pageY - touch.pageY)**2)
-            if (currDistance < minDistanceForIndex && currDistance > 0) {
-                minDistanceForIndex = currDistance
-                indexPosition = touch;
-            }
-        }
-        ctx.beginPath();
-        ctx.arc(indexPosition.pageX, indexPosition.pageY, 50, 0, 2 * Math.PI);
-        ctx.fillStyle = `#FF00FF`;
-        ctx.fill();
-    }
+    const index = getNearestTo(thumb, activeTouches);
+    drawCircleFill(index.pageX, index.pageY, 40, '#FF00FF');
+    drawText(index.pageX + 55, index.pageY - 2.5, "Index", "20px Arial", '#FF00FF', '#000000')
+    // vector from thumb to index marks the Y axis, so the position is always (0, distance)
+    var indexThumbDistance = Math.hypot(index.pageX - thumb.pageX, index.pageY - thumb.pageY);
+    drawText(index.pageX + 55, index.pageY+22.5, `(0, ${Math.round(indexThumbDistance)})`, "20px Arial", '#FF00FF', '#000000') 
 }
+
+
+// EVENT LISTENERS
 
 function changeTouch(e) {
     e.preventDefault();
