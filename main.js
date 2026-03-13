@@ -1,3 +1,9 @@
+if (!('ontouchstart' in window) && !(navigator.maxTouchPoints > 0) && !(navigator.msMaxTouchPoints > 0)) { 
+    alert("Hmm... It seems like you're not on a device with a touchscreen, this tool only works with a touchscreen");
+}
+
+
+
 const canvas = document.getElementById('canvas');
 let ctx;
 
@@ -125,7 +131,6 @@ function draw() {
         let transformed = toHandCoords(touch, thumb, nx, ny)
         drawText(touch.pageX, touch.pageY, angle, `(${Math.round(transformed.x)}, ${Math.round(transformed.y)})`, '#00ff00')
     }
-
 
     
 }
