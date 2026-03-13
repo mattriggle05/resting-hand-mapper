@@ -4,12 +4,12 @@
 
 A supporting app for a later project, detects and outputs the relative positions of fingers placed on the screen. 
 
+<img src="./demo.png" width="400">
+
 ### To do
 
-1. Add left vs right hand detection (easy)
-2. Add a way to get scale, current positions are in arbitrary pixels, we need an object of a known size to get inches
-3. Add a way to save and export the current hand layout from the site
-4. Add a way to average hand layouts over multiple placements for increased accuracy
+1. Add a way to get scale, current positions are in arbitrary pixels, we need an object of a known size to get inches
+2. Add a way to average hand layouts over multiple placements for increased accuracy
 
 ### How to run
 
