@@ -26,11 +26,18 @@ function drawCircleOutline(x, y, radius, color, lineWidth = 2) {
     ctx.stroke();
 }
 
-function drawText(x, y, text, font, fillColor, strokeColor) {
-    ctx.font = font;
+function drawText(x, y, angle, text, fillColor) {
+    ctx.save();
+    ctx.font = "25px sans-serif";
     ctx.fillStyle = fillColor;
-    ctx.strokeStyle = strokeColor;
-    ctx.fillText(text,x,y);
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 1;
+    ctx.textAlign = "center"
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillText(text, 0, -50);
+    ctx.strokeText(text, 0, -50);
+    ctx.restore();
 }
 
 function drawCircleFill(x, y, radius, color) {
@@ -64,35 +71,64 @@ function getNearestTo(point, touches) {
     return result;
 }
 
+function toHandCoords(touch, thumb, nx, ny) {
+    const dx = touch.pageX - thumb.pageX;
+    const dy = touch.pageY - thumb.pageY;
+    return {
+        x: (dx * -ny) + (dy * nx),
+        y: (dx * nx) + (dy * ny)
+    };
+}
+
 function draw() {
     const dpr = window.devicePixelRatio || 1;
     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
     for (const touch of activeTouches.values()) {
-        drawCircleOutline(touch.pageX, touch.pageY, 40, '#000000', 4);
-        drawCircleOutline(touch.pageX, touch.pageY, 40, '#00FF00', 2);
+        drawCircleOutline(touch.pageX, touch.pageY, 35, '#000000', 4);
+        drawCircleOutline(touch.pageX, touch.pageY, 35, '#00FF00', 2);
     }
 
     if (activeTouches.size !== 5) return;
 
     const centroid = getCentroid(activeTouches);
-    drawCircleFill(centroid.pageX, centroid.pageY, 22, '#000000');
-    drawCircleFill(centroid.pageX, centroid.pageY, 20, '#FF0000');
-
     const thumb = getFurthestFrom(centroid, activeTouches);
-    drawCircleFill(thumb.pageX, thumb.pageY, 40, '#0000FF');
-    drawText(thumb.pageX + 55, thumb.pageY - 2.5, "Thumb", "20px Arial", '#0000FF', '#000000')
-    // thumbs is always at the origin by convention
-    drawText(thumb.pageX + 55, thumb.pageY+22.5, "(0, 0)", "20px Arial", '#0000FF', '#000000')
-
     const index = getNearestTo(thumb, activeTouches);
-    drawCircleFill(index.pageX, index.pageY, 40, '#FF00FF');
-    drawText(index.pageX + 55, index.pageY - 2.5, "Index", "20px Arial", '#FF00FF', '#000000')
-    // vector from thumb to index marks the Y axis, so the position is always (0, distance)
-    var indexThumbDistance = Math.hypot(index.pageX - thumb.pageX, index.pageY - thumb.pageY);
-    drawText(index.pageX + 55, index.pageY+22.5, `(0, ${Math.round(indexThumbDistance)})`, "20px Arial", '#FF00FF', '#000000') 
-}
 
+    // vector from thumb to index marks the Y axis, so the position is always (0, distance)
+    var indexThumbDiffX = index.pageX - thumb.pageX
+    var indexThumbDiffY = index.pageY - thumb.pageY
+    var indexThumbDistance = Math.hypot(indexThumbDiffX, indexThumbDiffY);
+    
+
+    // draw coordinate grid lines
+    const nx = indexThumbDiffX / indexThumbDistance;
+    const ny = indexThumbDiffY / indexThumbDistance;
+
+    // y axis
+    ctx.setLineDash([10, 6]);
+    ctx.beginPath();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#000000aa";
+    ctx.moveTo(thumb.pageX - nx * 10000, thumb.pageY - ny * 10000);
+    ctx.lineTo(thumb.pageX + nx * 10000, thumb.pageY + ny * 10000);
+    ctx.stroke();
+    // x axis
+    ctx.beginPath();
+    ctx.moveTo(thumb.pageX - ny * 10000, thumb.pageY + nx * 10000);
+    ctx.lineTo(thumb.pageX + ny * 10000, thumb.pageY - nx * 10000);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    for (const touch of activeTouches.values()) {
+        let angle = Math.atan2(indexThumbDiffY, indexThumbDiffX) + Math.PI / 2;
+        let transformed = toHandCoords(touch, thumb, nx, ny)
+        drawText(touch.pageX, touch.pageY, angle, `(${Math.round(transformed.x)}, ${Math.round(transformed.y)})`, '#00ff00')
+    }
+
+
+    
+}
 
 // EVENT LISTENERS
 
