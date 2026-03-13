@@ -18,31 +18,44 @@
         }
 
         canvas {
+            touch-action: none;
+            border: 2px red dashed;
+        }
+
+        #main-canvas {
             display: block;
             width: 100vw;
             height: 100vh;
         }
 
-        p {
-            display: block;
+        #normalized-canvas {
             position: fixed;
-            font-size: 2vh;
-            font-family: sans-serif;
-            width: 98vw;
-            text-align: center;
+            display: block;
+            top: 0px;
+            right: 0px;
+            width: 30vw;
+            height: 30vh;
+            background-color: rgb(210, 210, 210);
+        }
+
+        #output {
+            position: fixed;
+            display: block;
+            top: 0px;
+            left: 0px;
+            width: 30vw;
+            height: 30vh;
+            background-color: rgb(210, 210, 210);
             border: 1px solid black;
-            margin: 1vw;
-            border-radius: 1vw;
         }
     </style>
 </head>
 
 <body>
-    <p>
-        Place 5 fingers on the screen
-    </p>
-    <canvas id="canvas"></canvas>
-    <script src="./main.js"></script>
+    <canvas id="main-canvas"></canvas>
+    <canvas id="normalized-canvas"></canvas>
+    <textarea id="output"></textarea>
+    <script src="main.js?v=sdoisndi"></script>
 </body>
 
 </html>

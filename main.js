@@ -3,19 +3,30 @@ if (!('ontouchstart' in window) && !(navigator.maxTouchPoints > 0) && !(navigato
 }
 
 
-
-const canvas = document.getElementById('canvas');
+const canvas = document.getElementById('main-canvas');
+const canvas2 = document.getElementById('normalized-canvas');
+const output = document.getElementById('output');
 let ctx;
+let ctx2;
 
 // MAKE THE CANVAS THE FULL PAGE
 
 function rescale() {
     const ratio = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
+
     canvas.width = rect.width * ratio;
     canvas.height = rect.height * ratio;
     ctx = canvas.getContext('2d');
     ctx.scale(ratio, ratio);
+
+    canvas2.width = rect.width * ratio * 0.3;
+    canvas2.height = rect.height * ratio * 0.3;
+    ctx2 = canvas2.getContext('2d');
+    ctx2.scale(ratio, ratio);
+
+    output.width = rect.width * ratio * 0.3;
+    output.height = rect.height * ratio * 0.3;
 }
 window.addEventListener('resize', rescale);
 rescale();
@@ -81,8 +92,8 @@ function toHandCoords(touch, thumb, nx, ny) {
     const dx = touch.pageX - thumb.pageX;
     const dy = touch.pageY - thumb.pageY;
     return {
-        x: (dx * -ny) + (dy * nx),
-        y: (dx * nx) + (dy * ny)
+        x: ((dx * -ny) + (dy * nx)).toFixed(4),
+        y: ((dx * nx) + (dy * ny)).toFixed(4)
     };
 }
 
@@ -106,7 +117,6 @@ function draw() {
     var indexThumbDiffY = index.pageY - thumb.pageY
     var indexThumbDistance = Math.hypot(indexThumbDiffX, indexThumbDiffY);
     
-
     // draw coordinate grid lines
     const nx = indexThumbDiffX / indexThumbDistance;
     const ny = indexThumbDiffY / indexThumbDistance;
@@ -126,13 +136,79 @@ function draw() {
     ctx.stroke();
     ctx.setLineDash([]);
 
+    var isRightHand = false;
+    var positions = [];
     for (const touch of activeTouches.values()) {
         let angle = Math.atan2(indexThumbDiffY, indexThumbDiffX) + Math.PI / 2;
         let transformed = toHandCoords(touch, thumb, nx, ny)
+        if (transformed.x != 0 || transformed.y != 0) positions.push(transformed);
+        if (transformed.x > 0.1) isRightHand = true;
         drawText(touch.pageX, touch.pageY, angle, `(${Math.round(transformed.x)}, ${Math.round(transformed.y)})`, '#00ff00')
     }
+    var outputJSON = {
+        isRightHand: isRightHand,
+        positions: positions,
+    }
+    output.value = JSON.stringify(outputJSON, null, "\t");
 
-    
+    const scale = ((canvas2.height / dpr) / (canvas.height / dpr)) * 0.9;
+
+    ctx2.clearRect(0, 0, canvas2.width / dpr, canvas2.height / dpr);
+
+    const anchorX = (canvas2.width / dpr) * (isRightHand ? 0.1 : 0.9);
+    const anchorY = (canvas2.height / dpr) * 0.95; 
+
+    // draw axes through thumb (thumb is at hand coord origin)
+    const thumbSx = anchorX;
+    const thumbSy = anchorY;
+
+    ctx2.setLineDash([10 * scale, 6 * scale]);
+    ctx2.lineWidth = 2 * scale;
+    ctx2.strokeStyle = '#000000aa';
+
+    // y axis — straight up in normalized view
+    ctx2.beginPath();
+    ctx2.moveTo(thumbSx, thumbSy + 10000 * scale);
+    ctx2.lineTo(thumbSx, thumbSy - 10000 * scale);
+    ctx2.stroke();
+
+    // x axis
+    ctx2.beginPath();
+    ctx2.moveTo(thumbSx - 10000 * scale, thumbSy);
+    ctx2.lineTo(thumbSx + 10000 * scale, thumbSy);
+    ctx2.stroke();
+
+    ctx2.setLineDash([]);
+
+    // draw fingers
+    for (const touch of activeTouches.values()) {
+        const hc = toHandCoords(touch, thumb, nx, ny);
+        const sx = anchorX + hc.x * scale;
+        const sy = anchorY + -(hc.y) * scale;
+
+        ctx2.beginPath();
+        ctx2.arc(sx, sy, 35 * scale, 0, 2 * Math.PI);
+        ctx2.lineWidth = 4 * scale;
+        ctx2.strokeStyle = '#000000';
+        ctx2.stroke();
+
+        ctx2.beginPath();
+        ctx2.arc(sx, sy, 35 * scale, 0, 2 * Math.PI);
+        ctx2.lineWidth = 2 * scale;
+        ctx2.strokeStyle = '#00FF00';
+        ctx2.stroke();
+
+        ctx2.save();
+        ctx2.font = `${25 * scale}px sans-serif`;
+        ctx2.fillStyle = '#00ff00';
+        ctx2.strokeStyle = '#000000';
+        ctx2.lineWidth = scale;
+        ctx2.textAlign = 'center';
+        ctx2.translate(sx, sy);
+        ctx2.fillText(`(${Math.round(hc.x)}, ${Math.round(hc.y)})`, 0, -50 * scale);
+        ctx2.strokeText(`(${Math.round(hc.x)}, ${Math.round(hc.y)})`, 0, -50 * scale);
+        ctx2.restore();
+    }
 }
 
 // EVENT LISTENERS
