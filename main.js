@@ -8,6 +8,8 @@ const canvas2 = document.getElementById('normalized-canvas');
 const output = document.getElementById('output');
 const pennySlider = document.getElementById('penny-slider');
 const pennyDiv = document.getElementById('penny-div');
+var outputJSON = { left: null, right: null };
+output.value = JSON.stringify(outputJSON);
 let ctx;
 let ctx2;
 
@@ -44,7 +46,7 @@ function getPennyRadiusPixels() {
 function pixelsToMm(pixels) {
     const pennyRadiusPixels = getPennyRadiusPixels();
     const pixelsPerMm = (pennyRadiusPixels * 2) / PENNY_DIAMETER_MM;
-    return (pixels / pixelsPerMm).toFixed(2);
+    return (pixels / pixelsPerMm);
 }
 
 function updatePenny() {
@@ -117,8 +119,8 @@ function toHandCoords(touch, thumb, nx, ny) {
     const dx = touch.pageX - thumb.pageX;
     const dy = touch.pageY - thumb.pageY;
     return {
-        x: ((dx * -ny) + (dy * nx)),
-        y: ((dx * nx) + (dy * ny))
+        x: (dx * -ny) + (dy * nx),
+        y: (dx * nx) + (dy * ny)
     };
 }
 
@@ -164,20 +166,36 @@ function draw() {
     for (const touch of activeTouches.values()) {
         let angle = Math.atan2(indexThumbDiffY, indexThumbDiffX) + Math.PI / 2;
         let transformed = toHandCoords(touch, thumb, nx, ny);
-        if (transformed.x != 0 || transformed.y != 0) positions.push(transformed);
+        if (transformed.x != 0 || transformed.y != 0) positions.push({
+            finger: "",
+            x: pixelsToMm(transformed.x),
+            y: pixelsToMm(transformed.y),
+        })
         if (transformed.x > 0.1) isRightHand = true;
-        drawText(touch.pageX, touch.pageY, angle, `(${Math.round(transformed.x)}, ${Math.round(transformed.y)})`, '#00ff00');
+        drawText(touch.pageX, touch.pageY, angle, `(${Math.round(pixelsToMm(transformed.x))}, ${Math.round(pixelsToMm(transformed.y))})`, '#00ff00');
     }
 
-    const positionsMm = positions.map(p => ({
+    var positionsMm = positions.map(p => ({
+        finger: "",
         x: pixelsToMm(p.x),
         y: pixelsToMm(p.y),
     }));
 
-    output.value = JSON.stringify({
-        isRightHand,
-        positionsMm,
-    }, null, "\t");
+
+    positionsMm.sort(function(a, b) {
+        return isRightHand ? parseFloat(b.x) - parseFloat(a.x) : parseFloat(a.x) - parseFloat(b.x);
+    });
+
+    const fingerNames = ["pinky" , "ring", "middle", "index"]
+    for (let i = 0; i < 4; i++) {
+        positionsMm[i].finger = fingerNames[i]
+    }
+
+    positionsMm.push({finger: "thumb", x: 0, y: 0})
+
+    outputJSON[isRightHand ? "right" : "left"] = positionsMm;
+
+    output.value = JSON.stringify(outputJSON);
 
     const scale = ((canvas2.height / dpr) / (canvas.height / dpr)) * 0.9;
     ctx2.clearRect(0, 0, canvas2.width / dpr, canvas2.height / dpr);
